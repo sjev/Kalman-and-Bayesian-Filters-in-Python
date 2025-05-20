@@ -1,6 +1,4 @@
 from typing import Callable, List, Optional, Tuple, Union
-
-import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats
 from filterpy.monte_carlo import systematic_resample
@@ -16,25 +14,7 @@ def create_uniform_particles(
     hdg_range: Tuple[float, float],
     n_particles: int,
 ) -> np.ndarray:
-    """
-    Create uniformly distributed particles within the specified ranges.
-
-    Parameters
-    ----------
-    x_range : Tuple[float, float]
-        Range for x position (min, max)
-    y_range : Tuple[float, float]
-        Range for y position (min, max)
-    hdg_range : Tuple[float, float]
-        Range for heading angle in radians (min, max)
-    n_particles : int
-        Number of particles to create
-
-    Returns
-    -------
-    np.ndarray
-        Array of shape (n_particles, 3) containing particles with columns [x, y, heading]
-    """
+    """Create uniformly distributed particles within specified ranges."""
     particles = np.empty((n_particles, 3))
     particles[:, 0] = uniform(x_range[0], x_range[1], size=n_particles)
     particles[:, 1] = uniform(y_range[0], y_range[1], size=n_particles)
@@ -46,23 +26,7 @@ def create_uniform_particles(
 def create_gaussian_particles(
     mean: ArrayLike, std: ArrayLike, n_particles: int
 ) -> np.ndarray:
-    """
-    Create normally distributed particles around a mean position.
-
-    Parameters
-    ----------
-    mean : ArrayLike
-        Mean position [x, y, heading]
-    std : ArrayLike
-        Standard deviations [std_x, std_y, std_heading]
-    n_particles : int
-        Number of particles to create
-
-    Returns
-    -------
-    np.ndarray
-        Array of shape (n_particles, 3) containing particles with columns [x, y, heading]
-    """
+    """Create normally distributed particles around a mean position."""
     particles = np.empty((n_particles, 3))
     particles[:, 0] = mean[0] + (randn(n_particles) * std[0])
     particles[:, 1] = mean[1] + (randn(n_particles) * std[1])
@@ -77,26 +41,7 @@ def predict(
     std: Tuple[float, float],
     dt: float = 1.0,
 ) -> np.ndarray:
-    """
-    Move particles according to control input u with noise.
-
-    Parameters
-    ----------
-    particles : np.ndarray
-        Array of shape (n_particles, 3) containing particles with columns [x, y, heading]
-    u : Tuple[float, float]
-        Control input as (heading change, velocity)
-    std : Tuple[float, float]
-        Standard deviations as (std for heading change, std for velocity)
-    dt : float, optional
-        Time step size, by default 1.0
-
-    Returns
-    -------
-    np.ndarray
-        Updated particles after applying the motion model
-    """
-    # Create a copy to avoid modifying the input
+    """Move particles according to control input u with noise."""
     new_particles = particles.copy()
     n_particles = len(particles)
 
@@ -119,35 +64,11 @@ def update_weights(
     R: float,
     landmarks: np.ndarray,
 ) -> np.ndarray:
-    """
-    Update particle weights based on measurement likelihood.
-
-    Parameters
-    ----------
-    particles : np.ndarray
-        Array of shape (n_particles, 3) containing particles with columns [x, y, heading]
-    weights : np.ndarray
-        Current weights for each particle
-    z : np.ndarray
-        Measurement values (distances to landmarks)
-    R : float
-        Measurement noise standard deviation
-    landmarks : np.ndarray
-        Array of landmark positions, shape (n_landmarks, 2)
-
-    Returns
-    -------
-    np.ndarray
-        Updated weights normalized to sum to 1
-    """
-    # Create a copy to avoid modifying the input
+    """Update particle weights based on measurement likelihood."""
     new_weights = weights.copy()
 
-    # Update weights based on measurement likelihood
     for i, landmark in enumerate(landmarks):
-        # Calculate distance from each particle to the landmark
         distance = np.linalg.norm(particles[:, 0:2] - landmark, axis=1)
-        # Update weights based on likelihood of the measurement
         new_weights *= scipy.stats.norm(distance, R).pdf(z[i])
 
     # Handle potential numerical issues
@@ -163,21 +84,7 @@ def update_weights(
 def estimate(
     particles: np.ndarray, weights: np.ndarray
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Compute the weighted mean and variance of the particle positions.
-
-    Parameters
-    ----------
-    particles : np.ndarray
-        Array of shape (n_particles, 3) containing particles with columns [x, y, heading]
-    weights : np.ndarray
-        Weights for each particle (normalized to sum to 1)
-
-    Returns
-    -------
-    Tuple[np.ndarray, np.ndarray]
-        Tuple containing (mean, variance) of particle positions
-    """
+    """Compute the weighted mean and variance of the particle positions."""
     pos = particles[:, 0:2]
     mean = np.average(pos, weights=weights, axis=0)
     var = np.average((pos - mean) ** 2, weights=weights, axis=0)
@@ -185,40 +92,14 @@ def estimate(
 
 
 def calculate_neff(weights: np.ndarray) -> float:
-    """
-    Calculate the effective number of particles.
-
-    Parameters
-    ----------
-    weights : np.ndarray
-        Weights for each particle (normalized to sum to 1)
-
-    Returns
-    -------
-    float
-        Effective number of particles
-    """
+    """Calculate the effective number of particles."""
     return 1.0 / np.sum(np.square(weights))
 
 
 def resample_particles(
     particles: np.ndarray, indexes: np.ndarray
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Resample particles based on provided indexes.
-
-    Parameters
-    ----------
-    particles : np.ndarray
-        Array of shape (n_particles, 3) containing particles with columns [x, y, heading]
-    indexes : np.ndarray
-        Indexes of particles to keep from resampling
-
-    Returns
-    -------
-    Tuple[np.ndarray, np.ndarray]
-        Tuple containing (new_particles, new_weights)
-    """
+    """Resample particles based on provided indexes."""
     new_particles = particles[indexes].copy()
     n_particles = len(new_particles)
     new_weights = np.ones(n_particles) / n_particles
@@ -230,45 +111,14 @@ def run_particle_filter(
     n_particles: int,
     iters: int = 18,
     sensor_std_err: float = 0.1,
-    do_plot: bool = True,
-    plot_particles: bool = False,
     xlim: Tuple[float, float] = (0, 20),
     ylim: Tuple[float, float] = (0, 20),
     initial_x: Optional[Tuple[float, float, float]] = None,
 ) -> Tuple[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
-    """
-    Run the complete particle filter simulation.
-
-    Parameters
-    ----------
-    n_particles : int
-        Number of particles to use
-    iters : int, optional
-        Number of iterations to run, by default 18
-    sensor_std_err : float, optional
-        Standard deviation of sensor error, by default 0.1
-    do_plot : bool, optional
-        Whether to create plots, by default True
-    plot_particles : bool, optional
-        Whether to plot particles, by default False
-    xlim : Tuple[float, float], optional
-        x-axis limits for plot, by default (0, 20)
-    ylim : Tuple[float, float], optional
-        y-axis limits for plot, by default (0, 20)
-    initial_x : Optional[Tuple[float, float, float]], optional
-        Initial position estimate [x, y, heading], by default None
-
-    Returns
-    -------
-    Tuple[np.ndarray, Tuple[np.ndarray, np.ndarray]]
-        Tuple containing (final state estimate positions, (mean, variance))
-    """
+    """Run particle filter simulation with console output for statistics."""
     # Define landmarks (known locations)
     landmarks = np.array([[-1, 2], [5, 10], [12, 14], [18, 21]])
     n_landmarks = len(landmarks)
-
-    if do_plot:
-        plt.figure()
 
     # Create particles and weights
     if initial_x is not None:
@@ -280,17 +130,14 @@ def run_particle_filter(
 
     weights = np.ones(n_particles) / n_particles
 
-    if plot_particles and do_plot:
-        alpha = 0.20
-        if n_particles > 5000:
-            alpha *= np.sqrt(5000) / np.sqrt(n_particles)
-        plt.scatter(particles[:, 0], particles[:, 1], alpha=alpha, color="g")
-
     # Storage for results
     xs = []
     robot_pos = np.array([0.0, 0.0])
 
-    for _ in range(iters):
+    print("Iteration | True Position | Estimated Position | Error (Distance)")
+    print("-" * 65)
+
+    for i in range(iters):
         # Move robot
         robot_pos += (1, 1)
 
@@ -315,33 +162,31 @@ def run_particle_filter(
         mu, var = estimate(particles, weights)
         xs.append(mu)
 
-        # Plot current state
-        if do_plot:
-            if plot_particles:
-                plt.scatter(
-                    particles[:, 0], particles[:, 1], color="k", marker=",", s=1
-                )
-            p1 = plt.scatter(
-                robot_pos[0], robot_pos[1], marker="+", color="k", s=180, lw=3
-            )
-            p2 = plt.scatter(mu[0], mu[1], marker="s", color="r")
+        # Calculate error (distance between true and estimated position)
+        error = np.linalg.norm(robot_pos - mu)
+
+        # Print statistics
+        print(
+            f"{i:9} | ({robot_pos[0]:.2f}, {robot_pos[1]:.2f}) | ({mu[0]:.2f}, {mu[1]:.2f}) | {error:.4f}"
+        )
 
     # Convert position history to numpy array
     xs = np.array(xs)
 
-    # Final plotting
-    if do_plot:
-        plt.legend([p1, p2], ["Actual", "PF"], loc=4, numpoints=1)
-        plt.xlim(*xlim)
-        plt.ylim(*ylim)
-        print("Final position error, variance:\n\t", mu - np.array([iters, iters]), var)
-        plt.show()
+    # Final statistics
+    final_mu, final_var = estimate(particles, weights)
+    final_error = np.linalg.norm(robot_pos - final_mu)
+    print("\nFinal statistics:")
+    print(f"True position: ({robot_pos[0]:.2f}, {robot_pos[1]:.2f})")
+    print(f"Estimated position: ({final_mu[0]:.2f}, {final_mu[1]:.2f})")
+    print(f"Error: {final_error:.4f}")
+    print(f"Variance: {final_var}")
 
-    return xs, (mu, var)
+    return xs, (final_mu, final_var)
 
 
 if __name__ == "__main__":
     from numpy.random import seed
 
     seed(2)
-    run_particle_filter(n_particles=5000, plot_particles=True)
+    run_particle_filter(n_particles=5000)
