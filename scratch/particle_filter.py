@@ -1,9 +1,16 @@
-from typing import Callable, List, Optional, Tuple, Union
+#!/usr/bin/env python3
+"""
+Particle Filter Simulation
+"""
+# %%
+from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 import scipy.stats
 from filterpy.monte_carlo import systematic_resample
 from numpy.linalg import norm
-from numpy.random import randn, uniform
+from numpy.random import randn, uniform, seed
+
+from pf_plots import plot_results
 
 ArrayLike = Union[np.ndarray, List[float], Tuple[float, ...]]
 
@@ -111,31 +118,41 @@ def run_particle_filter(
     n_particles: int,
     iters: int = 18,
     sensor_std_err: float = 0.1,
-    xlim: Tuple[float, float] = (0, 20),
-    ylim: Tuple[float, float] = (0, 20),
     initial_x: Optional[Tuple[float, float, float]] = None,
-) -> Tuple[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
-    """Run particle filter simulation with console output for statistics."""
+) -> Dict[str, List]:
+    """Run particle filter simulation with console output for statistics. Returns a dictionary of results."""
+
+    result = {
+        "particles": [],
+        "true_position": [],
+        "estimated_position": [],
+        "landmarks": [],
+    }
+
     # Define landmarks (known locations)
     landmarks = np.array([[-1, 2], [5, 10], [12, 14], [18, 21]])
     n_landmarks = len(landmarks)
 
+    result["landmarks"] = landmarks
+
     # Create particles and weights
     if initial_x is not None:
+        print("Creating Gaussian particles")
         particles = create_gaussian_particles(
             mean=initial_x, std=(5, 5, np.pi / 4), n_particles=n_particles
         )
     else:
+        print("Creating uniform particles")
         particles = create_uniform_particles((0, 20), (0, 20), (0, 6.28), n_particles)
 
     weights = np.ones(n_particles) / n_particles
 
-    # Storage for results
-    xs = []
     robot_pos = np.array([0.0, 0.0])
 
-    print("Iteration | True Position | Estimated Position | Error (Distance)")
-    print("-" * 65)
+    print(
+        f"{'Iteration':^10}|{'True Position':^20}|{'Estimated Position':^25}|{'Error':^15}|{'Neff':^10}"
+    )
+    print("-" * 83)
 
     for i in range(iters):
         # Move robot
@@ -152,41 +169,39 @@ def run_particle_filter(
             particles, weights, z=zs, R=sensor_std_err, landmarks=landmarks
         )
 
+        # Calculate Neff (effective number of particles)
+        neff = calculate_neff(weights)
+
         # Resample if too few effective particles
-        if calculate_neff(weights) < n_particles / 2:
+        if neff < n_particles / 2:
             indexes = systematic_resample(weights)
             particles, weights = resample_particles(particles, indexes)
             assert np.allclose(weights, 1 / n_particles)
 
         # Calculate state estimate
         mu, var = estimate(particles, weights)
-        xs.append(mu)
+
+        # Store results for plotting
+        result["particles"].append(particles.copy())
+        result["true_position"].append(robot_pos.copy())
+        result["estimated_position"].append(mu.copy())
 
         # Calculate error (distance between true and estimated position)
         error = np.linalg.norm(robot_pos - mu)
 
-        # Print statistics
+        # Print statistics with aligned columns
         print(
-            f"{i:9} | ({robot_pos[0]:.2f}, {robot_pos[1]:.2f}) | ({mu[0]:.2f}, {mu[1]:.2f}) | {error:.4f}"
+            f"{i:^10}|({robot_pos[0]:6.2f}, {robot_pos[1]:6.2f}){' ':4}|({mu[0]:6.2f}, {mu[1]:6.2f}){' ':9}|{error:^15.4f}|{neff:^10.1f}"
         )
 
-    # Convert position history to numpy array
-    xs = np.array(xs)
-
-    # Final statistics
-    final_mu, final_var = estimate(particles, weights)
-    final_error = np.linalg.norm(robot_pos - final_mu)
-    print("\nFinal statistics:")
-    print(f"True position: ({robot_pos[0]:.2f}, {robot_pos[1]:.2f})")
-    print(f"Estimated position: ({final_mu[0]:.2f}, {final_mu[1]:.2f})")
-    print(f"Error: {final_error:.4f}")
-    print(f"Variance: {final_var}")
-
-    return xs, (final_mu, final_var)
+    return result
 
 
-if __name__ == "__main__":
-    from numpy.random import seed
+# %%
 
-    seed(2)
-    run_particle_filter(n_particles=5000)
+
+seed(2)
+results = run_particle_filter(n_particles=5000)
+
+# %%
+plot_results(results)
