@@ -1,0 +1,12 @@
+[MASTER]
+# Minimal config for interactive scripts / notebooks
+
+[MESSAGES CONTROL]
+disable=
+    import-outside-toplevel,
+    missing-function-docstring,
+    missing-module-docstring,
+    invalid-name,
+    redefined-outer-name,
+    unused-import,
+    unused-variable
