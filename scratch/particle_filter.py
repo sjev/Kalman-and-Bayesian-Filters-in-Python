@@ -81,8 +81,7 @@ def update_weights(
     weights += 1.0e-300  # Avoid round-off to zero
 
     # Normalize weights
-    if np.sum(weights) > 0:
-        weights /= np.sum(weights)
+    weights /= np.sum(weights)
 
 
 def estimate(
