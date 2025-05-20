@@ -15,7 +15,6 @@ def plot_results(results: Dict[str, List]):
     """
     # Extract data from results
     landmarks = results["landmarks"]
-    particles_history = results["particles"]
 
     # Create plot
     plt.figure(figsize=(10, 8))
@@ -29,13 +28,25 @@ def plot_results(results: Dict[str, List]):
         s=100,
         label="Landmarks",
     )
-    # plot particles
-    for particles in particles_history:
+    # plot particles prediction
+    for particles in results["particles_pre"]:
         plt.scatter(
             particles[:, 0],
             particles[:, 1],
             marker="o",
             color="green",
+            s=2,
+            alpha=0.5,
+        )
+
+    # plot particles after resampling
+    # plot particles prediction
+    for particles in results["particles_post"]:
+        plt.scatter(
+            particles[:, 0],
+            particles[:, 1],
+            marker="o",
+            color="blue",
             s=2,
             alpha=0.5,
         )

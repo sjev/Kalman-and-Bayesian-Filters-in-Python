@@ -70,22 +70,19 @@ def update_weights(
     z: np.ndarray,
     R: float,
     landmarks: np.ndarray,
-) -> np.ndarray:
+) -> None:
     """Update particle weights based on measurement likelihood."""
-    new_weights = weights.copy()
 
     for i, landmark in enumerate(landmarks):
         distance = np.linalg.norm(particles[:, 0:2] - landmark, axis=1)
-        new_weights *= scipy.stats.norm(distance, R).pdf(z[i])
+        weights *= scipy.stats.norm(distance, R).pdf(z[i])
 
     # Handle potential numerical issues
-    new_weights += 1.0e-300  # Avoid round-off to zero
+    weights += 1.0e-300  # Avoid round-off to zero
 
     # Normalize weights
-    if np.sum(new_weights) > 0:
-        new_weights /= np.sum(new_weights)
-
-    return new_weights
+    if np.sum(weights) > 0:
+        weights /= np.sum(weights)
 
 
 def estimate(
@@ -103,15 +100,12 @@ def calculate_neff(weights: np.ndarray) -> float:
     return 1.0 / np.sum(np.square(weights))
 
 
-def resample_particles(
-    particles: np.ndarray, indexes: np.ndarray
-) -> Tuple[np.ndarray, np.ndarray]:
+def resample_particles(particles: np.ndarray, indexes: np.ndarray) -> np.ndarray:
     """Resample particles based on provided indexes."""
     new_particles = particles[indexes].copy()
     n_particles = len(new_particles)
-    new_weights = np.ones(n_particles) / n_particles
 
-    return new_particles, new_weights
+    return new_particles
 
 
 def run_particle_filter(
@@ -123,7 +117,8 @@ def run_particle_filter(
     """Run particle filter simulation with console output for statistics. Returns a dictionary of results."""
 
     result = {
-        "particles": [],
+        "particles_pre": [],
+        "particles_post": [],
         "true_position": [],
         "estimated_position": [],
         "landmarks": [],
@@ -164,10 +159,10 @@ def run_particle_filter(
         # Move particles according to motion model
         particles = predict(particles, u=(0.00, 1.414), std=(0.2, 0.05))
 
+        result["particles_pre"].append(particles.copy())
+
         # Update particle weights
-        weights = update_weights(
-            particles, weights, z=zs, R=sensor_std_err, landmarks=landmarks
-        )
+        update_weights(particles, weights, z=zs, R=sensor_std_err, landmarks=landmarks)
 
         # Calculate Neff (effective number of particles)
         neff = calculate_neff(weights)
@@ -175,14 +170,15 @@ def run_particle_filter(
         # Resample if too few effective particles
         if neff < n_particles / 2:
             indexes = systematic_resample(weights)
-            particles, weights = resample_particles(particles, indexes)
+            particles = resample_particles(particles, indexes)
+            weights.fill(1.0 / n_particles)
             assert np.allclose(weights, 1 / n_particles)
 
         # Calculate state estimate
         mu, var = estimate(particles, weights)
 
         # Store results for plotting
-        result["particles"].append(particles.copy())
+        result["particles_post"].append(particles.copy())
         result["true_position"].append(robot_pos.copy())
         result["estimated_position"].append(mu.copy())
 
